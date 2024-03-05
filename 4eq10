@@ -1,0 +1,199 @@
+#!/usr/bin/env perl
+use strict;
+use Getopt::Std;
+
+my $usage = "usage: 4eq10 [-n [+-*/p]*] N1 N2 N3 N4";
+
+my $num_var_nodes = 4;
+my $num_op_nodes = $num_var_nodes - 1;
+
+my @ops = ( '*', '/', '+', '-' );
+my $op_bits = 2; # ln2(@ops)
+my $num_opsets = (scalar @ops) ** $num_op_nodes;
+
+my @orders = (
+	[0,1,2,3], [0,1,3,2], [0,2,1,3], [0,2,3,1], [0,3,1,2], [0,3,2,1], 
+	[1,0,2,3], [1,0,3,2], [1,2,0,3], [1,2,3,0], [1,3,0,2], [1,3,2,0], 
+	[2,0,1,3], [2,0,3,1], [2,1,0,3], [2,1,3,0], [2,3,0,1], [2,3,1,0],
+	[3,0,1,2], [3,0,2,1], [3,1,0,2], [3,1,2,0], [3,2,0,1], [3,2,1,0],
+);
+my $num_orders = @orders;
+
+my $num_parensets = 6;
+
+main();
+sub main {
+	my %opt;
+	die $usage if not getopts('n:', \%opt);
+	my @vars = @ARGV;
+	die if not @vars or @vars < 2;
+	my $s = new_solver(@vars);
+	my %printed;
+	while (solve_next($s, $opt{n})) {
+		if (solved($s)) {
+			my $prt = print_soln($s);
+			if (not $printed{$prt}) {
+				print $prt, "\n";
+				$printed{$prt} = 1;
+			}
+		}
+	}
+}
+
+sub new_solver {
+	my %solver = (
+		'vars'      => \@_,
+		'goal'      => 10,
+		'order'     => -1,
+		'opset'     => 0,
+		'parenset'  => 0,
+	);
+	return \%solver;
+}
+
+sub solve_next {
+	my ($s, $no_ops) = @_;
+	if (++$s->{order} >= $num_orders) {
+		$s->{order} = 0;
+		my $np = ($no_ops =~ /p/) ? 1 : $num_parensets;
+		if (++$s->{parenset} >= $np) {
+			$s->{parenset} = 0;
+			for (;;) {
+				return 0 if ++$s->{opset} >= $num_opsets;
+				last unless opset_has($s->{opset}, $no_ops);
+			}
+		}
+	}
+	return 1;
+}
+
+sub solved {
+	my ($s) = @_;
+	return solve_total($s) == $s->{goal};
+}
+
+sub solve_op {
+	my ($op, $vL, $vR) = @_;
+	return undef if not defined $vL or not defined $vR;
+	if ($op == 2) {
+		return $vL + $vR;
+	} elsif ($op == 3) {
+		return $vL - $vR;
+	} elsif ($op == 0) {
+		return $vL * $vR;
+	} elsif ($op == 1) {
+		return undef if $vR == 0;
+		return $vL / $vR;
+	}
+	return undef;
+}
+
+sub op_var {
+	my ($s, $opx) = @_;
+	my $order = $orders[$s->{order}];
+	return ${$s->{vars}}[$$order[$opx]];
+}
+
+sub op_op {
+	my ($s, $opx) = @_;
+	return opset_op($s->{opset}, $opx);
+}
+
+sub opset_op {
+	my ($opset, $opx) = @_;
+	return ($opset >> ($op_bits * $opx)) & ((1 << $op_bits) -1);
+}
+
+sub opset_has {
+	my ($opset, $no_ops) = @_;
+	for (my $opx = 0; $opx < $num_op_nodes; ++$opx) {
+		my $op = $ops[opset_op($opset, $opx)];
+		return 1 if index($no_ops, $op) >= 0;
+	}
+	return 0;
+}
+
+sub solve_total {
+	my ($s) = @_;
+	my @solve_totals = (
+		\&solve_total_paren0,
+		\&solve_total_paren1,
+		\&solve_total_paren2,
+		\&solve_total_paren3,
+		\&solve_total_paren4,
+		\&solve_total_paren5,
+	);
+	my $sf = $solve_totals[$s->{parenset}];
+	return &$sf($s);
+}
+
+#  paren0 =   0   1   2   3
+##prec
+sub solve_total_paren0 {
+	my ($s) = @_;
+	return solve_total_paren1($s);
+}
+
+#  paren1 = ( 0   1 ) 2   3
+sub solve_total_paren1 {
+	my ($s) = @_;
+	my $t1 = solve_op(op_op($s,0), op_var($s,0), op_var($s,1));
+	my $t2 = solve_op(op_op($s,1), $t1, op_var($s,2));
+	my $t3 = solve_op(op_op($s,2), $t2, op_var($s,3));
+	return $t3;
+}
+
+#  paren2 = ( 0   1   2 ) 3
+##prec
+sub solve_total_paren2 {
+	my ($s) = @_;
+	return solve_total_paren1($s);
+}
+
+#  paren3 =   0 ( 1   2 ) 3
+sub solve_total_paren3 {
+	my ($s) = @_;
+	my $t1 = solve_op(op_op($s,1), op_var($s,1), op_var($s,2));
+	my $t2 = solve_op(op_op($s,0), op_var($s,0), $t1);
+	my $t3 = solve_op(op_op($s,2), $t2, op_var($s,3));
+	return $t3;
+}
+
+#  paren4 =   0 ( 1   2   3 )
+##prec
+sub solve_total_paren4 {
+	my ($s) = @_;
+	my $t1 = solve_op(op_op($s,1), op_var($s,1), op_var($s,2));
+	my $t2 = solve_op(op_op($s,2), $t1, op_var($s,3));
+	my $t3 = solve_op(op_op($s,0), op_var($s,0), $t2);
+	return $t3;
+}
+
+#  paren5 =   0   1 ( 2   3 )
+sub solve_total_paren5 {
+	my ($s) = @_;
+	my $t1 = solve_op(op_op($s,2), op_var($s,2), op_var($s,3));
+	my $t2 = solve_op(op_op($s,0), op_var($s,0), op_var($s,1));
+	my $t3 = solve_op(op_op($s,1), $t2, $t1);
+	return $t3;
+}
+
+sub print_soln {
+	my ($s) = @_;
+	my $r = '';
+	my $p = $s->{parenset};
+	for (my $i = 0; $i < 4; ++$i) {
+		$r .= "( " if 
+			($i == 0 and ($p == 1 or $p == 2)) or
+			($i == 1 and ($p == 3 or $p == 4)) or
+			($i == 2 and $p == 5);
+		$r .= op_var($s,$i);
+		$r .= " )" if
+			($i == 1 and $p == 1) or
+			($i == 2 and ($p == 2 or $p == 3)) or
+			($i == 3 and ($p == 4 or $p == 5));
+		$r .= " " . $ops[op_op($s,$i)] . " " if $i < 3;
+	}
+	$r .= " = " . solve_total($s);
+	return $r;
+}
