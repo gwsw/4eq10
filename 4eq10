@@ -2,12 +2,14 @@
 use strict;
 
 # Solve puzzles in the 4=10 game.
+
 my $usage = <<_EOF_;
-usage: 4eq10 [-n OPS] [-m #][-s][-S] N1 N2 N3 N4";
+usage: 4eq10 [-n OPS] [-m #][-s][-S] [-t] N1 N2 N3 N4";
              -n Do not use operator (+-*/)
              -m Print no more than # solutions
              -s Same as -m0
              -S Same as -m1
+             -t Don't print total
 _EOF_
 
 use Getopt::Std;
@@ -32,7 +34,7 @@ my $num_parensets = 6;
 main();
 sub main {
     my %opt;
-    die $usage if not getopts('m:n:sS', \%opt);
+    die $usage if not getopts('m:n:sSt', \%opt);
     my @vars = @ARGV;
     die $usage if not @vars or @vars < 2;
     my $s = new_solver(@vars);
@@ -44,12 +46,11 @@ sub main {
             my $prt = print_soln($s);
             if (not $uniq{$prt}) {
                 $uniq{$prt} = 1;
-                print $prt, "\n" if $solns < $max_print;
-                ++$solns;
+                print $prt, "\n" if $solns++ < $max_print;
             }
         }
     }
-    print "$solns solutions\n";
+    print "$solns solutions\n" unless $opt{t};
 }
 
 sub new_solver {
@@ -84,7 +85,7 @@ sub solved {
     return solve_total($s) == $s->{goal};
 }
 
-sub solve_op {
+sub op_perform {
     my ($s, $opx, $vL, $vR) = @_;
     my $op = op_op($s, $opx);
     return undef if not defined $vL or not defined $vR;
@@ -129,8 +130,9 @@ sub opset_has {
 sub all_prec {
     my ($opset) = @_;
     my $ap = 0;
-    for (my $opx = 0; $opx < $num_op_nodes; ++$opx, $ap <<= 1) {
+    for (my $opx = 0; $opx < $num_op_nodes; ++$opx) {
         my $op = opset_op($opset, $opx);
+        $ap <<= 1;
         $ap |= 1 if hi_prec($op);
     }
     return $ap;
@@ -175,7 +177,7 @@ sub solve_total {
             my $opx = ord($ch) - ord('0');
             my $v2 = pop @xstack;
             my $v1 = pop @xstack;
-            push @xstack, solve_op($s, $opx, $v1, $v2);
+            push @xstack, op_perform($s, $opx, $v1, $v2);
         }
     }
     return pop @xstack;
