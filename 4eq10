@@ -73,7 +73,8 @@ sub solved {
 }
 
 sub solve_op {
-	my ($op, $vL, $vR) = @_;
+	my ($s, $opx, $vL, $vR) = @_;
+	my $op = op_op($s, $opx);
 	return undef if not defined $vL or not defined $vR;
 	if ($op == 2) {
 		return $vL + $vR;
@@ -113,69 +114,58 @@ sub opset_has {
 	return 0;
 }
 
+sub all_prec {
+	my ($opset) = @_;
+	my $ap = 0;
+	for (my $opx = 0; $opx < $num_op_nodes; ++$opx, $ap <<= 1) {
+		my $op = opset_op($opset, $opx);
+		$ap |= 1 if hi_prec($op);
+	}
+	return $ap;
+}
+
+sub hi_prec {
+	my ($op) = @_;
+	return ($op <= 1); 
+}
+
 sub solve_total {
 	my ($s) = @_;
-	my @solve_totals = (
-		\&solve_total_paren0,
-		\&solve_total_paren1,
-		\&solve_total_paren2,
-		\&solve_total_paren3,
-		\&solve_total_paren4,
-		\&solve_total_paren5,
+	my @solve_algos = (
+		# A-B-C-D    A-B-C*D    A-B*C-D    A-B*C*D    A*B-C-D    A*B-C*D    A*B*C-D    A*B*C*D
+		'AB0C1D2', 'AB0CD21', 'ABC10D2', 'ABC1D20', 'AB0C1D2', 'AB0CD21', 'AB0C1D2', 'AB0C1D2',
+
+		# (A-B)-C-D  (A-B)-C*D  (A-B)*C-D  (A-B)*C*D  (A*B)-C-D  (A*B)-C*D  (A*B)*C-D  (A*B)*C*D
+		'AB0C1D2', 'AB0CD21', 'AB0C1D2', 'AB0C1D2', 'AB0C1D2', 'AB0CD21', 'AB0C1D2', 'AB0C1D2',
+
+		# (A-B-C)-D  (A-B-C)*D  (A-B*C)-D  (A-B*C)*D  (A*B-C)-D  (A*B-C)*D  (A*B*C)-D  (A*B*C)*D
+		'AB0C1D1', 'AB0C1D2', 'ABC10D2', 'ABC10D2', 'AB0C1D2', 'AB0C1D2', 'AB0C1D2', 'AB0C1D2',
+
+		# A-(B-C)-D  A-(B-C)*D  A-(B*C)-D  A-(B*C)*D  A*(B-C)-D  A*(B-C)*D  A*(B*C)-D  A*(B*C)*D
+		'ABC10D2', 'ABC1D20', 'ABC10D2', 'ABC1D20', 'ABC10D2', 'ABC10D2', 'ABC10D2', 'ABC20D2',
+
+		# A-(B-C-D)  A-(B-C*D)  A-(B*C-D)  A-(B*C*D)  A*(B-C-D)  A*(B-C*D)  A*(B*C-D)  A*(B*C*D)
+		'ABC1D20', 'ABCD210', 'ABC1D20', 'ABC1D20', 'ABC1D20', 'ABCD210', 'ABC1D20', 'ABC1D20',
+
+		# A-B-(C-D)  A-B-(C*D)  A-B*(C-D)  A-B*(C*D)  A*B-(C-D)  A*B-(C*D)  A*B*(C-D)  A*B*(C*D)
+		'AB0CD21', 'AB0CD21', 'ABCD210', 'ABCD210', 'AB0CD21', 'AB0CD21', 'AB0CD21', 'AB0CD21',
 	);
-	my $sf = $solve_totals[$s->{parenset}];
-	return &$sf($s);
-}
 
-#  paren0 =   0   1   2   3
-##prec
-sub solve_total_paren0 {
-	my ($s) = @_;
-	return solve_total_paren1($s);
-}
-
-#  paren1 = ( 0   1 ) 2   3
-sub solve_total_paren1 {
-	my ($s) = @_;
-	my $t1 = solve_op(op_op($s,0), op_var($s,0), op_var($s,1));
-	my $t2 = solve_op(op_op($s,1), $t1, op_var($s,2));
-	my $t3 = solve_op(op_op($s,2), $t2, op_var($s,3));
-	return $t3;
-}
-
-#  paren2 = ( 0   1   2 ) 3
-##prec
-sub solve_total_paren2 {
-	my ($s) = @_;
-	return solve_total_paren1($s);
-}
-
-#  paren3 =   0 ( 1   2 ) 3
-sub solve_total_paren3 {
-	my ($s) = @_;
-	my $t1 = solve_op(op_op($s,1), op_var($s,1), op_var($s,2));
-	my $t2 = solve_op(op_op($s,0), op_var($s,0), $t1);
-	my $t3 = solve_op(op_op($s,2), $t2, op_var($s,3));
-	return $t3;
-}
-
-#  paren4 =   0 ( 1   2   3 )
-##prec
-sub solve_total_paren4 {
-	my ($s) = @_;
-	my $t1 = solve_op(op_op($s,1), op_var($s,1), op_var($s,2));
-	my $t2 = solve_op(op_op($s,2), $t1, op_var($s,3));
-	my $t3 = solve_op(op_op($s,0), op_var($s,0), $t2);
-	return $t3;
-}
-
-#  paren5 =   0   1 ( 2   3 )
-sub solve_total_paren5 {
-	my ($s) = @_;
-	my $t1 = solve_op(op_op($s,2), op_var($s,2), op_var($s,3));
-	my $t2 = solve_op(op_op($s,0), op_var($s,0), op_var($s,1));
-	my $t3 = solve_op(op_op($s,1), $t2, $t1);
-	return $t3;
+	my @xstack;
+	my $sx = ($s->{parenset} * 8) + all_prec($s->{opset});
+	my $algo = $solve_algos[$sx];
+	foreach my $ch (split //, $algo) {
+		if ($ch =~ /[A-D]/) {
+			my $opx = ord($ch) - ord('A');
+			push @xstack, op_var($s, $opx);
+		} elsif ($ch =~ /[0-2]/) {
+			my $opx = ord($ch) - ord('0');
+			my $v2 = pop @xstack;
+			my $v1 = pop @xstack;
+			push @xstack, solve_op($s, $opx, $v1, $v2);
+		}
+	}
+	return pop @xstack;
 }
 
 sub print_soln {
