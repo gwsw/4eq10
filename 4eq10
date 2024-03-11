@@ -20,7 +20,7 @@ my $num_op_nodes = $num_var_nodes - 1;
 
 my @ops = ( '*', '/', '+', '-' );
 my $op_bits = 2; # ln2(@ops)
-my $num_opsets = (scalar @ops) ** $num_op_nodes;
+my $num_oplists = (scalar @ops) ** $num_op_nodes;
 my $num_prec_cfg = 8; # 
 
 my @orders = (
@@ -58,14 +58,14 @@ sub main {
 
 # -------------------------------------------------------------
 # Solver represents an expression as 3 ops interspersed between 4 vars.
-# The ops are stored in an opset, an integer divided into 2-bit fields.
+# The ops are stored in an oplist, an integer divided into 2-bit fields.
 # There can also be one pair of parentheses distributed among the vars.
 sub new_solver {
     my %solver = (
         'vars'      => \@_,
         'goal'      => 10,
         'order'     => -1,
-        'opset'     => 0,
+        'oplist'     => 0,
         'parenset'  => 0,
     );
     return \%solver;
@@ -80,8 +80,8 @@ sub solve_next {
         if (++$s->{parenset} >= $np) {
             $s->{parenset} = 0;
             for (;;) {
-                return 0 if ++$s->{opset} >= $num_opsets; # no more solutions
-                last unless opset_has_any($s->{opset}, $no_ops);
+                return 0 if ++$s->{oplist} >= $num_oplists; # no more solutions
+                last unless oplist_has_any($s->{oplist}, $no_ops);
             }
         }
     }
@@ -119,7 +119,7 @@ sub solve_eval {
     );
 
     my @xstack;
-    my $ax = ($s->{parenset} * $num_prec_cfg) + prec_cfg($s->{opset});
+    my $ax = ($s->{parenset} * $num_prec_cfg) + prec_cfg($s->{oplist});
     foreach my $ch (split //, $solve_algos[$ax]) {
         if ($ch =~ /[A-D]/) {
             my $opx = ord($ch) - ord('A');
@@ -143,7 +143,7 @@ sub solve_var {
 
 sub solve_op {
     my ($s, $opx) = @_;
-    return opset_op($s->{opset}, $opx);
+    return oplist_op($s->{oplist}, $opx);
 }
 
 sub solve_tostring {
@@ -171,31 +171,31 @@ sub solve_tostring {
 sub op_perform {
     my ($op, $vL, $vR) = @_;
     return undef if not defined $vL or not defined $vR;
-    if ($op == 2) {
-        return $vL + $vR;
-    } elsif ($op == 3) {
-        return $vL - $vR;
-    } elsif ($op == 0) {
+    if ($op == 0) {
         return $vL * $vR;
     } elsif ($op == 1) {
         return undef if $vR == 0;
         return $vL / $vR;
+    } elsif ($op == 2) {
+        return $vL + $vR;
+    } elsif ($op == 3) {
+        return $vL - $vR;
     }
     return undef;
 }
 
 # -------------------------------------------------------------
-# Return one op from an opset.
-sub opset_op {
-    my ($opset, $opx) = @_;
-    return ($opset >> ($op_bits * $opx)) & ((1 << $op_bits) -1);
+# Return one op from an oplist.
+sub oplist_op {
+    my ($oplist, $opx) = @_;
+    return ($oplist >> ($op_bits * $opx)) & ((1 << $op_bits) -1);
 }
 
-# Does an opset contain any op named by op_names?
-sub opset_has_any {
-    my ($opset, $op_names) = @_;
+# Does an oplist contain any op named by op_names?
+sub oplist_has_any {
+    my ($oplist, $op_names) = @_;
     for (my $opx = 0; $opx < $num_op_nodes; ++$opx) {
-        my $op_name = $ops[opset_op($opset, $opx)];
+        my $op_name = $ops[oplist_op($oplist, $opx)];
         return 1 if index($op_names, $op_name) >= 0;
     }
     return 0;
@@ -204,10 +204,10 @@ sub opset_has_any {
 # -------------------------------------------------------------
 # Index in list of all permutations of precedence.
 sub prec_cfg {
-    my ($opset) = @_;
+    my ($oplist) = @_;
     my $ap = 0;
     for (my $opx = 0; $opx < $num_op_nodes; ++$opx) {
-        my $op = opset_op($opset, $opx);
+        my $op = oplist_op($oplist, $opx);
         $ap <<= 1;
         $ap |= 1 if hi_prec($op);
     }
