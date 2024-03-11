@@ -1,8 +1,16 @@
 #!/usr/bin/env perl
 use strict;
-use Getopt::Std;
 
-my $usage = "usage: 4eq10 [-n [+-*/p]*] N1 N2 N3 N4";
+# Solve puzzles in the 4=10 game.
+my $usage = <<_EOF_;
+usage: 4eq10 [-n OPS] [-m #][-s][-S] N1 N2 N3 N4";
+             -n Do not use operator (+-*/)
+			 -m Print no more than # solutions
+			 -s Same as -m0
+			 -S Same as -m1
+_EOF_
+
+use Getopt::Std;
 
 my $num_var_nodes = 4;
 my $num_op_nodes = $num_var_nodes - 1;
@@ -24,20 +32,24 @@ my $num_parensets = 6;
 main();
 sub main {
 	my %opt;
-	die $usage if not getopts('n:', \%opt);
+	die $usage if not getopts('m:n:sS', \%opt);
 	my @vars = @ARGV;
-	die if not @vars or @vars < 2;
+	die $usage if not @vars or @vars < 2;
 	my $s = new_solver(@vars);
-	my %printed;
+	my %uniq;
+	my $solns = 0;
+	my $max_print = ($opt{m} ? $opt{m} : $opt{S} ? 1 : $opt{s} ? 0 : 99999999);
 	while (solve_next($s, $opt{n})) {
 		if (solved($s)) {
 			my $prt = print_soln($s);
-			if (not $printed{$prt}) {
-				print $prt, "\n";
-				$printed{$prt} = 1;
+			if (not $uniq{$prt}) {
+				$uniq{$prt} = 1;
+				print $prt, "\n" if $solns < $max_print;
+				++$solns;
 			}
 		}
 	}
+	print "$solns solutions\n";
 }
 
 sub new_solver {
@@ -131,6 +143,7 @@ sub hi_prec {
 
 sub solve_total {
 	my ($s) = @_;
+	# THIS DOES NOT SCALE VERY WELL!
 	my @solve_algos = (
 		# A-B-C-D    A-B-C*D    A-B*C-D    A-B*C*D    A*B-C-D    A*B-C*D    A*B*C-D    A*B*C*D
 		'AB0C1D2', 'AB0CD21', 'ABC10D2', 'ABC1D20', 'AB0C1D2', 'AB0CD21', 'AB0C1D2', 'AB0C1D2',
