@@ -52,7 +52,7 @@ sub main {
 }
 
 # -------------------------------------------------------------
-# Solver represents an expression as 3 ops interspersed between 4 vars.
+# Solver represents an expression as N-1 ops interspersed between N vars.
 # The ops are stored in an oplist, an integer divided into 2-bit fields.
 # There can also be one pair of parentheses distributed among the vars.
 sub new_solver {
@@ -65,7 +65,6 @@ sub new_solver {
         'oplist'         => 0,
         'parenset'       => 0,
         'num_oplists'    => $num_ops ** $num_op_nodes,
-        'num_prec_cfg'   => (1 << $num_op_nodes) * $prec_bits,
         'num_var_orders' => factorial(scalar @_),
         'num_parensets'  => (@_)*(@_-1)/2,
     );
@@ -95,29 +94,29 @@ sub solve_next {
 sub solve_eval {
     my ($s) = @_;
     # THIS DOES NOT SCALE VERY WELL!
+    die "works only with 4 numbers\n" if num_op_nodes($s) != 3;
     my @solve_algos = (
-        # A-B-C-D    A-B-C*D    A-B*C-D    A-B*C*D    A*B-C-D    A*B-C*D    A*B*C-D    A*B*C*D
-        'AB0C1D2', 'AB0CD21', 'ABC10D2', 'ABC1D20', 'AB0C1D2', 'AB0CD21', 'AB0C1D2', 'AB0C1D2',
+        #  A-B-C-D    A-B-C*D    A-B*C-D    A-B*C*D    A*B-C-D    A*B-C*D    A*B*C-D    A*B*C*D
+        [ 'AB0C1D2', 'AB0CD21', 'ABC10D2', 'ABC1D20', 'AB0C1D2', 'AB0CD21', 'AB0C1D2', 'AB0C1D2' ],
 
-        # (A-B)-C-D  (A-B)-C*D  (A-B)*C-D  (A-B)*C*D  (A*B)-C-D  (A*B)-C*D  (A*B)*C-D  (A*B)*C*D
-        'AB0C1D2', 'AB0CD21', 'AB0C1D2', 'AB0C1D2', 'AB0C1D2', 'AB0CD21', 'AB0C1D2', 'AB0C1D2',
+        #  (A-B)-C-D  (A-B)-C*D  (A-B)*C-D  (A-B)*C*D  (A*B)-C-D  (A*B)-C*D  (A*B)*C-D  (A*B)*C*D
+        [ 'AB0C1D2', 'AB0CD21', 'AB0C1D2', 'AB0C1D2', 'AB0C1D2', 'AB0CD21', 'AB0C1D2', 'AB0C1D2' ],
 
-        # (A-B-C)-D  (A-B-C)*D  (A-B*C)-D  (A-B*C)*D  (A*B-C)-D  (A*B-C)*D  (A*B*C)-D  (A*B*C)*D
-        'AB0C1D2', 'AB0C1D2', 'ABC10D2', 'ABC10D2', 'AB0C1D2', 'AB0C1D2', 'AB0C1D2', 'AB0C1D2',
+        #  (A-B-C)-D  (A-B-C)*D  (A-B*C)-D  (A-B*C)*D  (A*B-C)-D  (A*B-C)*D  (A*B*C)-D  (A*B*C)*D
+        [ 'AB0C1D2', 'AB0C1D2', 'ABC10D2', 'ABC10D2', 'AB0C1D2', 'AB0C1D2', 'AB0C1D2', 'AB0C1D2' ],
 
-        # A-(B-C)-D  A-(B-C)*D  A-(B*C)-D  A-(B*C)*D  A*(B-C)-D  A*(B-C)*D  A*(B*C)-D  A*(B*C)*D
-        'ABC10D2', 'ABC1D20', 'ABC10D2', 'ABC1D20', 'ABC10D2', 'ABC10D2', 'ABC10D2', 'ABC10D2',
+        #  A-(B-C)-D  A-(B-C)*D  A-(B*C)-D  A-(B*C)*D  A*(B-C)-D  A*(B-C)*D  A*(B*C)-D  A*(B*C)*D
+        [ 'ABC10D2', 'ABC1D20', 'ABC10D2', 'ABC1D20', 'ABC10D2', 'ABC10D2', 'ABC10D2', 'ABC10D2' ],
 
-        # A-(B-C-D)  A-(B-C*D)  A-(B*C-D)  A-(B*C*D)  A*(B-C-D)  A*(B-C*D)  A*(B*C-D)  A*(B*C*D)
-        'ABC1D20', 'ABCD210', 'ABC1D20', 'ABC1D20', 'ABC1D20', 'ABCD210', 'ABC1D20', 'ABC1D20',
+        #  A-(B-C-D)  A-(B-C*D)  A-(B*C-D)  A-(B*C*D)  A*(B-C-D)  A*(B-C*D)  A*(B*C-D)  A*(B*C*D)
+        [ 'ABC1D20', 'ABCD210', 'ABC1D20', 'ABC1D20', 'ABC1D20', 'ABCD210', 'ABC1D20', 'ABC1D20' ],
 
-        # A-B-(C-D)  A-B-(C*D)  A-B*(C-D)  A-B*(C*D)  A*B-(C-D)  A*B-(C*D)  A*B*(C-D)  A*B*(C*D)
-        'AB0CD21', 'AB0CD21', 'ABCD210', 'ABCD210', 'AB0CD21', 'AB0CD21', 'AB0CD21', 'AB0CD21',
+        #  A-B-(C-D)  A-B-(C*D)  A-B*(C-D)  A-B*(C*D)  A*B-(C-D)  A*B-(C*D)  A*B*(C-D)  A*B*(C*D)
+        [ 'AB0CD21', 'AB0CD21', 'ABCD210', 'ABCD210', 'AB0CD21', 'AB0CD21', 'AB0CD21', 'AB0CD21' ],
     );
 
     my @xstack;
-    my $ax = ($s->{parenset} * $s->{num_prec_cfg}) + oplist_prec_cfg($s);
-    foreach my $ch (split //, $solve_algos[$ax]) {
+    foreach my $ch (split //, $solve_algos[$s->{parenset}][oplist_prec_cfg($s)]) {
         if ($ch =~ /[A-D]/) { # $num_var_nodes
             my $opx = ord($ch) - ord('A');
             push @xstack, solve_var($s, $opx);
@@ -125,7 +124,7 @@ sub solve_eval {
             my $opx = ord($ch) - ord('0');
             my $v2 = pop @xstack;
             my $v1 = pop @xstack;
-            my $op = solve_op($s, $opx);
+            my $op = oplist_op($s, $opx);
             push @xstack, &{$op_impl[$op]}($v1, $v2);
         }
     }
@@ -139,6 +138,7 @@ sub solved {
     return solve_eval($s) == $s->{goal};
 }
 
+# -------------------------------------------------------------
 sub solve_var {
     my ($s, $opx) = @_;
     my @orders = (
@@ -149,11 +149,6 @@ sub solve_var {
     );
     my $order = $orders[$s->{order}];
     return ${$s->{vars}}[$$order[$opx]];
-}
-
-sub solve_op {
-    my ($s, $opx) = @_;
-    return oplist_op($s->{oplist}, $opx);
 }
 
 # -------------------------------------------------------------
@@ -171,7 +166,7 @@ sub solve_tostring {
             ($i == 1 and $p == 1) or
             ($i == 2 and ($p == 2 or $p == 3)) or
             ($i == 3 and ($p == 4 or $p == 5));
-        $r .= " " . $ops[solve_op($s,$i)] . " " if $i < 3;
+        $r .= " " . $ops[oplist_op($s,$i)] . " " if $i < 3;
     }
     $r .= " = " . solve_eval($s) if $add_eq;
     return $r;
@@ -187,15 +182,15 @@ sub op_sub { my ($vL, $vR) = @_; return $vL - $vR; }
 # -------------------------------------------------------------
 # Return one op from an oplist.
 sub oplist_op {
-    my ($oplist, $opx) = @_;
-    return ($oplist >> ($op_bits * $opx)) & ((1 << $op_bits) -1);
+    my ($s, $opx) = @_;
+    return ($s->{oplist} >> ($op_bits * $opx)) & ((1 << $op_bits) -1);
 }
 
 # Does an oplist contain any op named by op_names?
 sub oplist_has_any {
     my ($s, $op_names) = @_;
     for (my $opx = 0; $opx < num_op_nodes($s); ++$opx) {
-        my $op_name = $ops[oplist_op($s->{oplist}, $opx)];
+        my $op_name = $ops[oplist_op($s, $opx)];
         return 1 if index($op_names, $op_name) >= 0;
     }
     return 0;
@@ -206,7 +201,7 @@ sub oplist_prec_cfg {
     my ($s) = @_;
     my $ap = 0;
     for (my $opx = 0; $opx < num_op_nodes($s); ++$opx) {
-        my $op = oplist_op($s->{oplist}, $opx);
+        my $op = oplist_op($s, $opx);
         $ap <<= $prec_bits;
         $ap |= $op_prec[$op];
     }
@@ -218,6 +213,7 @@ sub num_op_nodes {
     return scalar @{$s->{vars}} - 1;
 }
 
+# -------------------------------------------------------------
 sub factorial {
     my ($n) = @_;
     my $r = 1;
