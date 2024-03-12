@@ -69,7 +69,6 @@ sub new_solver {
         'oplist'         => 0,
         'parenset'       => 0,
         'num_oplists'    => $num_ops ** $num_op_nodes,
-        'num_var_orders' => scalar @orders,
         'num_parensets'  => (@_)*(@_-1)/2,
     );
     return \%solver;
@@ -97,7 +96,7 @@ sub permute {
 # Increment to the next possible solution.
 sub solve_next {
     my ($s, $no_ops) = @_;
-    if (++$s->{order} >= $s->{num_var_orders}) {
+    if (++$s->{order} >= scalar @{$s->{orders}}) {
         $s->{order} = 0;
         my $np = ($no_ops =~ /p/) ? 1 : $s->{num_parensets};
         if (++$s->{parenset} >= $np) {
@@ -138,10 +137,10 @@ sub solve_eval {
 
     my @xstack;
     foreach my $ch (split //, $solve_algos[$s->{parenset}][oplist_prec_cfg($s)]) {
-        if ($ch =~ /[A-D]/) { # $num_var_nodes
+        if ($ch =~ /[A-D]/) { # scalar @{$s->{vars}}
             my $opx = ord($ch) - ord('A');
             push @xstack, solve_var($s, $opx);
-        } elsif ($ch =~ /[0-2]/) { # $num_op_nodes
+        } elsif ($ch =~ /[0-2]/) { # num_op_nodes($s)
             my $opx = ord($ch) - ord('0');
             my $v2 = pop @xstack;
             my $v1 = pop @xstack;
