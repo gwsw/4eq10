@@ -19,8 +19,6 @@ use Getopt::Std;
 # Constants
 
 # Nodes are the on-screen slots that can be manipulated by the player.
-my $num_var_nodes;
-my $num_op_nodes;
 
 my @ops     = ( '*', '/', '+', '-' );
 my @op_prec = (  1,   1,   0,   0  );
@@ -38,8 +36,6 @@ sub main {
     die $usage if not getopts('m:n:sSt', \%opt);
     my @vars = @ARGV;
     die $usage if not @vars or @vars < 2;
-    $num_var_nodes = @vars;
-    $num_op_nodes = $num_var_nodes - 1;
 
     my $s = new_solver(@vars);
     my %seen;
@@ -62,12 +58,14 @@ sub main {
 # The ops are stored in an oplist, an integer divided into 2-bit fields.
 # There can also be one pair of parentheses distributed among the vars.
 sub new_solver {
+my $num_op_nodes = scalar(@_) - 1;
     my %solver = (
         'vars'           => \@_,
         'goal'           => 10,
         'order'          => -1,
         'oplist'         => 0,
         'parenset'       => 0,
+'num_op_nodes' => $num_op_nodes,
         'num_oplists'    => $num_ops ** $num_op_nodes,
         'num_prec_cfg'   => (1 << $num_op_nodes) * $prec_bits,
         'num_var_orders' => 24, # factorial($num_var_nodes)
@@ -198,7 +196,7 @@ sub oplist_op {
 # Does an oplist contain any op named by op_names?
 sub oplist_has_any {
     my ($s, $op_names) = @_;
-    for (my $opx = 0; $opx < $num_op_nodes; ++$opx) {
+    for (my $opx = 0; $opx < $s->{num_op_nodes}; ++$opx) {
         my $op_name = $ops[oplist_op($s->{oplist}, $opx)];
         return 1 if index($op_names, $op_name) >= 0;
     }
@@ -209,7 +207,7 @@ sub oplist_has_any {
 sub oplist_prec_cfg {
     my ($s) = @_;
     my $ap = 0;
-    for (my $opx = 0; $opx < $num_op_nodes; ++$opx) {
+    for (my $opx = 0; $opx < $s->{num_op_nodes}; ++$opx) {
         my $op = oplist_op($s->{oplist}, $opx);
         $ap <<= $prec_bits;
         $ap |= $op_prec[$op];
