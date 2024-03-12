@@ -58,16 +58,9 @@ sub main {
 sub new_solver {
     # Nodes are the on-screen slots that can be manipulated by the player.
     my $num_op_nodes = scalar(@_) - 1;
-    my @orders = (
-        [0,1,2,3], [0,1,3,2], [0,2,1,3], [0,2,3,1], [0,3,1,2], [0,3,2,1], 
-        [1,0,2,3], [1,0,3,2], [1,2,0,3], [1,2,3,0], [1,3,0,2], [1,3,2,0], 
-        [2,0,1,3], [2,0,3,1], [2,1,0,3], [2,1,3,0], [2,3,0,1], [2,3,1,0],
-        [3,0,1,2], [3,0,2,1], [3,1,0,2], [3,1,2,0], [3,2,0,1], [3,2,1,0],
-    );
-    ##my @orders;
-    ##my @perm = 0 .. num_op_nodes($s);
-    ##permute(\@orders, \@perm, scalar @perm);
-
+    my @orders;
+    my @perm = 0 .. $num_op_nodes;
+    permute(\@orders, \@perm, scalar @perm);
     my %solver = (
         'vars'           => \@_,
         'goal'           => 10,
@@ -80,6 +73,24 @@ sub new_solver {
         'num_parensets'  => (@_)*(@_-1)/2,
     );
     return \%solver;
+}
+
+# -------------------------------------------------------------
+sub permute {
+    my ($list, $arr, $len) = @_;
+    # Heap's algorithm
+    if ($len <= 1) {
+        my @copy = @$arr;
+        push @$list, \@copy;
+    } else {
+        for (my $i = 0; $i < $len; ++$i) {
+            permute($list, $arr, $len-1);
+            my $ix = ($len & 1) ? 0 : $i;
+            my $t = $$arr[$ix];
+            $$arr[$ix] = $$arr[$len-1];
+            $$arr[$len-1] = $t;
+        }
+    }
 }
 
 # -------------------------------------------------------------
@@ -155,22 +166,6 @@ sub solve_var {
 
     my $order = ${$s->{orders}}[$s->{order}];
     return ${$s->{vars}}[$$order[$opx]];
-}
-
-sub permute {
-    my ($list, $arr, $len) = @_;
-    # Heap's algorithm
-    if ($len <= 1) {
-        push @$list, $arr;
-    } else {
-        for (my $i = 0; $i < $len; ++$i) {
-            permute($list, $arr, $len-1);
-            my $ix = ($len & 1) ? 0 : $i;
-            my $t = $$arr[$ix];
-            $$arr[$ix] = $$arr[$len-1];
-            $$arr[$len-1] = $t;
-        }
-    }
 }
 
 # -------------------------------------------------------------
