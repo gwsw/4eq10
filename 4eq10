@@ -21,16 +21,15 @@ use Getopt::Std;
 # Nodes are the on-screen slots that can be manipulated by the player.
 my $num_var_nodes;
 my $num_op_nodes;
-my @ops = ( '*', '/', '+', '-' );
-my $num_ops = @ops;
-my $op_bits = 2; # ln2($num_ops)
-# my $num_prec = 2; # two precedence levels, AS and MD
-my $prec_bits = 1; # ln2($num_prec)
 
-my $num_oplists;
-my $num_prec_cfg;
-my $num_var_orders;
-my $num_parensets;
+my @ops     = ( '*', '/', '+', '-' );
+my @op_prec = (  1,   1,   0,   0  );
+my @op_impl = ( \&op_mul, \&op_div, \&op_add, \&op_sub );
+my $num_ops = @ops;
+my $op_bits = 2; # ceil(ln2($num_ops))
+
+#my $num_prec = 2; # two precedence levels, AS and MD
+my $prec_bits = 1; # ceil(ln2($num_prec))
 
 # -------------------------------------------------------------
 main();
@@ -39,7 +38,9 @@ sub main {
     die $usage if not getopts('m:n:sSt', \%opt);
     my @vars = @ARGV;
     die $usage if not @vars or @vars < 2;
-    setup(scalar @vars);
+    $num_var_nodes = @vars;
+    $num_op_nodes = $num_var_nodes - 1;
+
     my $s = new_solver(@vars);
     my %seen;
     my $solns = 0;
@@ -56,27 +57,21 @@ sub main {
     print "$solns solutions\n" unless $opt{t};
 }
 
-sub setup() {
-    my ($var_nodes) = @_;
-    $num_var_nodes = $var_nodes;
-    $num_op_nodes = $num_var_nodes - 1;
-    $num_oplists = $num_ops ** $num_op_nodes;
-    $num_prec_cfg = (1 << $num_op_nodes) * $prec_bits;
-    $num_var_orders = 24; # factorial($num_var_nodes)
-    $num_parensets = 6; # ABCD, (AB)CD, (ABC)D, A(BC)D, A(BCD), AB(CD)
-}
-
 # -------------------------------------------------------------
 # Solver represents an expression as 3 ops interspersed between 4 vars.
 # The ops are stored in an oplist, an integer divided into 2-bit fields.
 # There can also be one pair of parentheses distributed among the vars.
 sub new_solver {
     my %solver = (
-        'vars'      => \@_,
-        'goal'      => 10,
-        'order'     => -1,
-        'oplist'     => 0,
-        'parenset'  => 0,
+        'vars'           => \@_,
+        'goal'           => 10,
+        'order'          => -1,
+        'oplist'         => 0,
+        'parenset'       => 0,
+        'num_oplists'    => $num_ops ** $num_op_nodes,
+        'num_prec_cfg'   => (1 << $num_op_nodes) * $prec_bits,
+        'num_var_orders' => 24, # factorial($num_var_nodes)
+        'num_parensets'  => 6, # ABCD, (AB)CD, (ABC)D, A(BC)D, A(BCD), AB(CD)
     );
     return \%solver;
 }
@@ -85,13 +80,13 @@ sub new_solver {
 # Increment to the next possible solution.
 sub solve_next {
     my ($s, $no_ops) = @_;
-    if (++$s->{order} >= $num_var_orders) {
+    if (++$s->{order} >= $s->{num_var_orders}) {
         $s->{order} = 0;
-        my $np = ($no_ops =~ /p/) ? 1 : $num_parensets;
+        my $np = ($no_ops =~ /p/) ? 1 : $s->{num_parensets};
         if (++$s->{parenset} >= $np) {
             $s->{parenset} = 0;
             for (;;) {
-                return 0 if ++$s->{oplist} >= $num_oplists; # no more solutions
+                return 0 if ++$s->{oplist} >= $s->{num_oplists}; # no more solutions
                 last unless oplist_has_any($s->{oplist}, $no_ops);
             }
         }
@@ -125,7 +120,7 @@ sub solve_eval {
     );
 
     my @xstack;
-    my $ax = ($s->{parenset} * $num_prec_cfg) + prec_cfg($s->{oplist});
+    my $ax = ($s->{parenset} * $s->{num_prec_cfg}) + oplist_prec_cfg($s->{oplist});
     foreach my $ch (split //, $solve_algos[$ax]) {
         if ($ch =~ /[A-D]/) { # $num_var_nodes
             my $opx = ord($ch) - ord('A');
@@ -134,7 +129,8 @@ sub solve_eval {
             my $opx = ord($ch) - ord('0');
             my $v2 = pop @xstack;
             my $v1 = pop @xstack;
-            push @xstack, op_perform(solve_op($s, $opx), $v1, $v2);
+            my $op = solve_op($s, $opx);
+            push @xstack, &{$op_impl[$op]}($v1, $v2);
         }
     }
     return pop @xstack;
@@ -187,21 +183,10 @@ sub solve_tostring {
 
 # -------------------------------------------------------------
 # Perform an arithmetic operation.
-sub op_perform {
-    my ($op, $vL, $vR) = @_;
-    return undef if not defined $vL or not defined $vR;
-    if ($op == 0) {
-        return $vL * $vR;
-    } elsif ($op == 1) {
-        return undef if $vR == 0;
-        return $vL / $vR;
-    } elsif ($op == 2) {
-        return $vL + $vR;
-    } elsif ($op == 3) {
-        return $vL - $vR;
-    }
-    return undef;
-}
+sub op_mul { my ($vL, $vR) = @_; return $vL * $vR; }
+sub op_div { my ($vL, $vR) = @_; return undef if $vR == 0; return $vL / $vR; }
+sub op_add { my ($vL, $vR) = @_; return $vL + $vR; }
+sub op_sub { my ($vL, $vR) = @_; return $vL - $vR; }
 
 # -------------------------------------------------------------
 # Return one op from an oplist.
@@ -220,20 +205,14 @@ sub oplist_has_any {
     return 0;
 }
 
-# -------------------------------------------------------------
 # Index in list of all permutations of precedence.
-sub prec_cfg {
+sub oplist_prec_cfg {
     my ($oplist) = @_;
     my $ap = 0;
     for (my $opx = 0; $opx < $num_op_nodes; ++$opx) {
         my $op = oplist_op($oplist, $opx);
-        $ap <<= 1;
-        $ap |= 1 if hi_prec($op);
+        $ap <<= $prec_bits;
+        $ap |= $op_prec[$op];
     }
     return $ap;
-}
-
-sub hi_prec {
-    my ($op) = @_;
-    return ($op <= 1); # '*' and '/'
 }
