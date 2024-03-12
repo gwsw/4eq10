@@ -97,9 +97,8 @@ sub solve_next {
     if (++$s->{order} >= scalar @{$s->{orders}}) {
         $s->{order} = 0;
         my $nv = @{$s->{vars}};
-        my $num_parensets = $nv * ($nv-1) / 2;
-        my $np = ($no_ops =~ /p/) ? 1 : $num_parensets;
-        if (++$s->{parenset} >= $np) {
+        my $num_parensets = ($no_ops =~ /p/) ? 1 : $nv * ($nv-1) / 2;
+        if (++$s->{parenset} >= $num_parensets) {
             $s->{parenset} = 0;
             my $num_oplists = $num_ops ** num_op_nodes($s);
             for (;;) {
@@ -115,7 +114,7 @@ sub solve_next {
 # Evaluate the expression represented by a solver.
 sub solve_eval {
     my ($s) = @_;
-    die "works only with 4 numbers" if num_op_nodes($s) != 3;
+    works_only_with($s, 4);
     my @solve_algos = (
         #  A-B-C-D    A-B-C*D    A-B*C-D    A-B*C*D    A*B-C-D    A*B-C*D    A*B*C-D    A*B*C*D
         [ 'AB0C1D2', 'AB0CD21', 'ABC10D2', 'ABC1D20', 'AB0C1D2', 'AB0CD21', 'AB0C1D2', 'AB0C1D2' ],
@@ -162,8 +161,7 @@ sub solved {
 # -------------------------------------------------------------
 sub solve_var {
     my ($s, $opx) = @_;
-    die "works only with 4 numbers" if num_op_nodes($s) != 3;
-
+    works_only_with($s, 4);
     my $order = ${$s->{orders}}[$s->{order}];
     return ${$s->{vars}}[$$order[$opx]];
 }
@@ -171,10 +169,10 @@ sub solve_var {
 # -------------------------------------------------------------
 sub solve_tostring {
     my ($s, $add_eq) = @_;
-    die "works only with 4 numbers" if num_op_nodes($s) != 3;
+    works_only_with($s, 4);
     my $r = '';
     my $p = $s->{parenset};
-    for (my $i = 0; $i < 4; ++$i) {
+    for (my $i = 0; $i < num_var_nodes($s); ++$i) {
         $r .= "( " if 
             ($i == 0 and ($p == 1 or $p == 2)) or
             ($i == 1 and ($p == 3 or $p == 4)) or
@@ -184,7 +182,7 @@ sub solve_tostring {
             ($i == 1 and $p == 1) or
             ($i == 2 and ($p == 2 or $p == 3)) or
             ($i == 3 and ($p == 4 or $p == 5));
-        $r .= " " . $ops[oplist_op($s,$i)] . " " if $i < 3;
+        $r .= " " . $ops[oplist_op($s,$i)] . " " if $i < num_op_nodes($s);
     }
     $r .= " = " . solve_eval($s) if $add_eq;
     return $r;
@@ -228,15 +226,15 @@ sub oplist_prec_cfg {
 
 sub num_op_nodes {
     my ($s) = @_;
-    return scalar @{$s->{vars}} - 1;
+    return num_var_nodes($s) - 1;
 }
 
-# -------------------------------------------------------------
-sub factorial {
-    my ($n) = @_;
-    my $r = 1;
-    for (; $n > 1; --$n) {
-        $r *= $n;
-    }
-    return $r;
+sub num_var_nodes {
+    my ($s) = @_;
+    return scalar @{$s->{vars}};
+}
+
+sub works_only_with {
+    my ($s, $n) = @_;
+    die "works only with 4 numbers" if num_var_nodes($s) != $n;
 }
