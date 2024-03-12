@@ -6,7 +6,7 @@ use strict;
 
 my $usage = <<_EOF_;
 usage: 4eq10 [-n OPS] [-m #][-s][-S] [-t] N1 N2 N3 N4";
-             -n Operator(s) prohibited for this game (+-*/)
+             -n Operator(s) prohibited for this game: [-+*/p]*
              -m Print no more than # solutions
              -s Same as -m0
              -S Same as -m1
@@ -15,22 +15,20 @@ _EOF_
 
 use Getopt::Std;
 
+# -------------------------------------------------------------
+# Constants
+
+# Nodes are the on-screen slots that can be manipulated by the player.
 my $num_var_nodes = 4;
 my $num_op_nodes = $num_var_nodes - 1;
-
 my @ops = ( '*', '/', '+', '-' );
-my $op_bits = 2; # ln2(@ops)
-my $num_oplists = (scalar @ops) ** $num_op_nodes;
-my $num_prec_cfg = 8; # 
+my $prec_bits = 1; # just two precedence levels, lo and hi
 
-my @orders = (
-    [0,1,2,3], [0,1,3,2], [0,2,1,3], [0,2,3,1], [0,3,1,2], [0,3,2,1], 
-    [1,0,2,3], [1,0,3,2], [1,2,0,3], [1,2,3,0], [1,3,0,2], [1,3,2,0], 
-    [2,0,1,3], [2,0,3,1], [2,1,0,3], [2,1,3,0], [2,3,0,1], [2,3,1,0],
-    [3,0,1,2], [3,0,2,1], [3,1,0,2], [3,1,2,0], [3,2,0,1], [3,2,1,0],
-);
-my $num_orders = @orders;
-
+my $num_ops = @ops;
+my $op_bits = 2; # ln2($num_ops)
+my $num_oplists = $num_ops ** $num_op_nodes;
+my $num_prec_cfg = (1 << $num_ops_nodes) * $prec_bits;
+my $num_var_orders = 24; # factorial($num_var_nodes)
 my $num_parensets = 6; # ABCD, (AB)CD, (ABC)D, A(BC)D, A(BCD), AB(CD)
 
 # -------------------------------------------------------------
@@ -71,10 +69,11 @@ sub new_solver {
     return \%solver;
 }
 
+# -------------------------------------------------------------
 # Increment to the next possible solution.
 sub solve_next {
     my ($s, $no_ops) = @_;
-    if (++$s->{order} >= $num_orders) {
+    if (++$s->{order} >= $num_var_orders) {
         $s->{order} = 0;
         my $np = ($no_ops =~ /p/) ? 1 : $num_parensets;
         if (++$s->{parenset} >= $np) {
@@ -88,12 +87,7 @@ sub solve_next {
     return 1;
 }
 
-# Is solver at the goal?
-sub solved {
-    my ($s) = @_;
-    return solve_eval($s) == $s->{goal};
-}
-
+# -------------------------------------------------------------
 # Evaluate the expression represented by a solver.
 sub solve_eval {
     my ($s) = @_;
@@ -121,22 +115,34 @@ sub solve_eval {
     my @xstack;
     my $ax = ($s->{parenset} * $num_prec_cfg) + prec_cfg($s->{oplist});
     foreach my $ch (split //, $solve_algos[$ax]) {
-        if ($ch =~ /[A-D]/) {
+        if ($ch =~ /[A-D]/) { # $num_var_nodes
             my $opx = ord($ch) - ord('A');
             push @xstack, solve_var($s, $opx);
-        } elsif ($ch =~ /[0-2]/) {
+        } elsif ($ch =~ /[0-2]/) { # $num_op_nodes
             my $opx = ord($ch) - ord('0');
             my $v2 = pop @xstack;
             my $v1 = pop @xstack;
-            my $op = solve_op($s, $opx);
-            push @xstack, op_perform($op, $v1, $v2);
+            push @xstack, op_perform(solve_op($s, $opx), $v1, $v2);
         }
     }
     return pop @xstack;
 }
 
+# -------------------------------------------------------------
+# Is solver at the goal?
+sub solved {
+    my ($s) = @_;
+    return solve_eval($s) == $s->{goal};
+}
+
 sub solve_var {
     my ($s, $opx) = @_;
+    my @orders = (
+        [0,1,2,3], [0,1,3,2], [0,2,1,3], [0,2,3,1], [0,3,1,2], [0,3,2,1], 
+        [1,0,2,3], [1,0,3,2], [1,2,0,3], [1,2,3,0], [1,3,0,2], [1,3,2,0], 
+        [2,0,1,3], [2,0,3,1], [2,1,0,3], [2,1,3,0], [2,3,0,1], [2,3,1,0],
+        [3,0,1,2], [3,0,2,1], [3,1,0,2], [3,1,2,0], [3,2,0,1], [3,2,1,0],
+    );
     my $order = $orders[$s->{order}];
     return ${$s->{vars}}[$$order[$opx]];
 }
@@ -146,6 +152,7 @@ sub solve_op {
     return oplist_op($s->{oplist}, $opx);
 }
 
+# -------------------------------------------------------------
 sub solve_tostring {
     my ($s) = @_;
     my $r = '';
