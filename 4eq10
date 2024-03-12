@@ -66,8 +66,8 @@ sub new_solver {
         'parenset'       => 0,
         'num_oplists'    => $num_ops ** $num_op_nodes,
         'num_prec_cfg'   => (1 << $num_op_nodes) * $prec_bits,
-        'num_var_orders' => 24, # factorial($num_var_nodes)
-        'num_parensets'  => 6, # ABCD, (AB)CD, (ABC)D, A(BC)D, A(BCD), AB(CD)
+        'num_var_orders' => factorial(scalar @_),
+        'num_parensets'  => (@_)*(@_-1)/2,
     );
     return \%solver;
 }
@@ -216,4 +216,13 @@ sub oplist_prec_cfg {
 sub num_op_nodes {
     my ($s) = @_;
     return scalar @{$s->{vars}} - 1;
+}
+
+sub factorial {
+    my ($n) = @_;
+    my $r = 1;
+    for (; $n > 1; --$n) {
+        $r *= $n;
+    }
+    return $r;
 }
