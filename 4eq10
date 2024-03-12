@@ -68,8 +68,6 @@ sub new_solver {
         'orders'         => \@orders,
         'oplist'         => 0,
         'parenset'       => 0,
-        'num_oplists'    => $num_ops ** $num_op_nodes,
-        'num_parensets'  => (@_)*(@_-1)/2,
     );
     return \%solver;
 }
@@ -98,11 +96,14 @@ sub solve_next {
     my ($s, $no_ops) = @_;
     if (++$s->{order} >= scalar @{$s->{orders}}) {
         $s->{order} = 0;
-        my $np = ($no_ops =~ /p/) ? 1 : $s->{num_parensets};
+        my $nv = @{$s->{vars}};
+        my $num_parensets = $nv * ($nv-1) / 2;
+        my $np = ($no_ops =~ /p/) ? 1 : $num_parensets;
         if (++$s->{parenset} >= $np) {
             $s->{parenset} = 0;
+            my $num_oplists = $num_ops ** num_op_nodes($s);
             for (;;) {
-                return 0 if ++$s->{oplist} >= $s->{num_oplists}; # no more solutions
+                return 0 if ++$s->{oplist} >= $num_oplists; # no more solutions
                 last unless oplist_has_any($s, $no_ops);
             }
         }
