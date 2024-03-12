@@ -19,17 +19,18 @@ use Getopt::Std;
 # Constants
 
 # Nodes are the on-screen slots that can be manipulated by the player.
-my $num_var_nodes = 4;
-my $num_op_nodes = $num_var_nodes - 1;
+my $num_var_nodes;
+my $num_op_nodes;
 my @ops = ( '*', '/', '+', '-' );
-my $prec_bits = 1; # just two precedence levels, lo and hi
-
 my $num_ops = @ops;
 my $op_bits = 2; # ln2($num_ops)
-my $num_oplists = $num_ops ** $num_op_nodes;
-my $num_prec_cfg = (1 << $num_ops_nodes) * $prec_bits;
-my $num_var_orders = 24; # factorial($num_var_nodes)
-my $num_parensets = 6; # ABCD, (AB)CD, (ABC)D, A(BC)D, A(BCD), AB(CD)
+# my $num_prec = 2; # two precedence levels, AS and MD
+my $prec_bits = 1; # ln2($num_prec)
+
+my $num_oplists;
+my $num_prec_cfg;
+my $num_var_orders;
+my $num_parensets;
 
 # -------------------------------------------------------------
 main();
@@ -38,6 +39,7 @@ sub main {
     die $usage if not getopts('m:n:sSt', \%opt);
     my @vars = @ARGV;
     die $usage if not @vars or @vars < 2;
+    setup(scalar @vars);
     my $s = new_solver(@vars);
     my %seen;
     my $solns = 0;
@@ -52,6 +54,16 @@ sub main {
         }
     }
     print "$solns solutions\n" unless $opt{t};
+}
+
+sub setup() {
+    my ($var_nodes) = @_;
+    $num_var_nodes = $var_nodes;
+    $num_op_nodes = $num_var_nodes - 1;
+    $num_oplists = $num_ops ** $num_op_nodes;
+    $num_prec_cfg = (1 << $num_op_nodes) * $prec_bits;
+    $num_var_orders = 24; # factorial($num_var_nodes)
+    $num_parensets = 6; # ABCD, (AB)CD, (ABC)D, A(BC)D, A(BCD), AB(CD)
 }
 
 # -------------------------------------------------------------
