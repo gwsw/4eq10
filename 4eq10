@@ -166,7 +166,7 @@ sub solve_op {
 
 # -------------------------------------------------------------
 sub solve_tostring {
-    my ($s) = @_;
+    my ($s, $add_eq) = @_;
     my $r = '';
     my $p = $s->{parenset};
     for (my $i = 0; $i < 4; ++$i) {
@@ -181,7 +181,7 @@ sub solve_tostring {
             ($i == 3 and ($p == 4 or $p == 5));
         $r .= " " . $ops[solve_op($s,$i)] . " " if $i < 3;
     }
-    $r .= " = " . solve_eval($s);
+    $r .= " = " . solve_eval($s) if $add_eq;
     return $r;
 }
 
