@@ -58,14 +58,25 @@ sub main {
 sub new_solver {
     # Nodes are the on-screen slots that can be manipulated by the player.
     my $num_op_nodes = scalar(@_) - 1;
+    my @orders = (
+        [0,1,2,3], [0,1,3,2], [0,2,1,3], [0,2,3,1], [0,3,1,2], [0,3,2,1], 
+        [1,0,2,3], [1,0,3,2], [1,2,0,3], [1,2,3,0], [1,3,0,2], [1,3,2,0], 
+        [2,0,1,3], [2,0,3,1], [2,1,0,3], [2,1,3,0], [2,3,0,1], [2,3,1,0],
+        [3,0,1,2], [3,0,2,1], [3,1,0,2], [3,1,2,0], [3,2,0,1], [3,2,1,0],
+    );
+    ##my @orders;
+    ##my @perm = 0 .. num_op_nodes($s);
+    ##permute(\@orders, \@perm, scalar @perm);
+
     my %solver = (
         'vars'           => \@_,
         'goal'           => 10,
         'order'          => -1, # so solve_next will return order=>0
+        'orders'         => \@orders,
         'oplist'         => 0,
         'parenset'       => 0,
         'num_oplists'    => $num_ops ** $num_op_nodes,
-        'num_var_orders' => factorial(scalar @_),
+        'num_var_orders' => scalar @orders,
         'num_parensets'  => (@_)*(@_-1)/2,
     );
     return \%solver;
@@ -93,8 +104,7 @@ sub solve_next {
 # Evaluate the expression represented by a solver.
 sub solve_eval {
     my ($s) = @_;
-    # THIS DOES NOT SCALE VERY WELL!
-    die "works only with 4 numbers\n" if num_op_nodes($s) != 3;
+    die "works only with 4 numbers" if num_op_nodes($s) != 3;
     my @solve_algos = (
         #  A-B-C-D    A-B-C*D    A-B*C-D    A-B*C*D    A*B-C-D    A*B-C*D    A*B*C-D    A*B*C*D
         [ 'AB0C1D2', 'AB0CD21', 'ABC10D2', 'ABC1D20', 'AB0C1D2', 'AB0CD21', 'AB0C1D2', 'AB0C1D2' ],
@@ -141,19 +151,32 @@ sub solved {
 # -------------------------------------------------------------
 sub solve_var {
     my ($s, $opx) = @_;
-    my @orders = (
-        [0,1,2,3], [0,1,3,2], [0,2,1,3], [0,2,3,1], [0,3,1,2], [0,3,2,1], 
-        [1,0,2,3], [1,0,3,2], [1,2,0,3], [1,2,3,0], [1,3,0,2], [1,3,2,0], 
-        [2,0,1,3], [2,0,3,1], [2,1,0,3], [2,1,3,0], [2,3,0,1], [2,3,1,0],
-        [3,0,1,2], [3,0,2,1], [3,1,0,2], [3,1,2,0], [3,2,0,1], [3,2,1,0],
-    );
-    my $order = $orders[$s->{order}];
+    die "works only with 4 numbers" if num_op_nodes($s) != 3;
+
+    my $order = ${$s->{orders}}[$s->{order}];
     return ${$s->{vars}}[$$order[$opx]];
+}
+
+sub permute {
+    my ($list, $arr, $len) = @_;
+    # Heap's algorithm
+    if ($len <= 1) {
+        push @$list, $arr;
+    } else {
+        for (my $i = 0; $i < $len; ++$i) {
+            permute($list, $arr, $len-1);
+            my $ix = ($len & 1) ? 0 : $i;
+            my $t = $$arr[$ix];
+            $$arr[$ix] = $$arr[$len-1];
+            $$arr[$len-1] = $t;
+        }
+    }
 }
 
 # -------------------------------------------------------------
 sub solve_tostring {
     my ($s, $add_eq) = @_;
+    die "works only with 4 numbers" if num_op_nodes($s) != 3;
     my $r = '';
     my $p = $s->{parenset};
     for (my $i = 0; $i < 4; ++$i) {
