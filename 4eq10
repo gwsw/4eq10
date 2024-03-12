@@ -5,7 +5,8 @@ use strict;
 # Given 4 numbers, add operators and parentheses to make them sum to 10.
 
 my $usage = <<_EOF_;
-usage: 4eq10 [-n OPS] [-m #][-s][-S] [-t] N1 N2 N3 N4";
+usage: 4eq10 [-n OPS] [-g#] [-m#][-s][-S] [-t] N1 N2 N3 N4";
+             -g Goal (default 10)
              -n Operator(s) prohibited for this game: [-+*/p]*
              -m Print no more than # solutions
              -s Same as -m0
@@ -31,11 +32,11 @@ my $prec_bits = 1; # ceil(ln2($num_prec))
 main();
 sub main {
     my %opt;
-    die $usage if not getopts('m:n:sSt', \%opt);
+    die $usage if not getopts('g:m:n:sSt', \%opt);
     my @vars = @ARGV;
     die $usage if not @vars or @vars < 2;
 
-    my $s = new_solver(@vars);
+    my $s = new_solver(\@vars, $opt{g});
     my %seen;
     my $solns = 0;
     my $max_print = ($opt{m} ? $opt{m} : $opt{S} ? 1 : $opt{s} ? 0 : 99999999);
@@ -56,14 +57,16 @@ sub main {
 # The ops are stored in an oplist, an integer divided into 2-bit fields.
 # There can also be one pair of parentheses distributed among the vars.
 sub new_solver {
+    my ($vars, $goal) = @_;
+    $goal = 10 if not defined $goal;
     # Nodes are the on-screen slots that can be manipulated by the player.
-    my $num_op_nodes = scalar(@_) - 1;
+    my $num_op_nodes = scalar(@$vars) - 1;
     my @orders;
     my @perm = 0 .. $num_op_nodes;
     permute(\@orders, \@perm, scalar @perm);
     my %solver = (
-        'vars'           => \@_,
-        'goal'           => 10,
+        'vars'           => $vars,
+        'goal'           => $goal,
         'order'          => -1, # so solve_next will return order=>0
         'orders'         => \@orders,
         'oplist'         => 0,
