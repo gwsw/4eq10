@@ -112,10 +112,10 @@ sub solve_eval {
         'AB0C1D2', 'AB0CD21', 'AB0C1D2', 'AB0C1D2', 'AB0C1D2', 'AB0CD21', 'AB0C1D2', 'AB0C1D2',
 
         # (A-B-C)-D  (A-B-C)*D  (A-B*C)-D  (A-B*C)*D  (A*B-C)-D  (A*B-C)*D  (A*B*C)-D  (A*B*C)*D
-        'AB0C1D1', 'AB0C1D2', 'ABC10D2', 'ABC10D2', 'AB0C1D2', 'AB0C1D2', 'AB0C1D2', 'AB0C1D2',
+        'AB0C1D2', 'AB0C1D2', 'ABC10D2', 'ABC10D2', 'AB0C1D2', 'AB0C1D2', 'AB0C1D2', 'AB0C1D2',
 
         # A-(B-C)-D  A-(B-C)*D  A-(B*C)-D  A-(B*C)*D  A*(B-C)-D  A*(B-C)*D  A*(B*C)-D  A*(B*C)*D
-        'ABC10D2', 'ABC1D20', 'ABC10D2', 'ABC1D20', 'ABC10D2', 'ABC10D2', 'ABC10D2', 'ABC20D2',
+        'ABC10D2', 'ABC1D20', 'ABC10D2', 'ABC1D20', 'ABC10D2', 'ABC10D2', 'ABC10D2', 'ABC10D2',
 
         # A-(B-C-D)  A-(B-C*D)  A-(B*C-D)  A-(B*C*D)  A*(B-C-D)  A*(B-C*D)  A*(B*C-D)  A*(B*C*D)
         'ABC1D20', 'ABCD210', 'ABC1D20', 'ABC1D20', 'ABC1D20', 'ABCD210', 'ABC1D20', 'ABC1D20',
