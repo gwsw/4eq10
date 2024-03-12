@@ -87,7 +87,7 @@ sub solve_next {
             $s->{parenset} = 0;
             for (;;) {
                 return 0 if ++$s->{oplist} >= $s->{num_oplists}; # no more solutions
-                last unless oplist_has_any($s->{oplist}, $no_ops);
+                last unless oplist_has_any($s, $no_ops);
             }
         }
     }
@@ -120,7 +120,7 @@ sub solve_eval {
     );
 
     my @xstack;
-    my $ax = ($s->{parenset} * $s->{num_prec_cfg}) + oplist_prec_cfg($s->{oplist});
+    my $ax = ($s->{parenset} * $s->{num_prec_cfg}) + oplist_prec_cfg($s);
     foreach my $ch (split //, $solve_algos[$ax]) {
         if ($ch =~ /[A-D]/) { # $num_var_nodes
             my $opx = ord($ch) - ord('A');
@@ -197,9 +197,9 @@ sub oplist_op {
 
 # Does an oplist contain any op named by op_names?
 sub oplist_has_any {
-    my ($oplist, $op_names) = @_;
+    my ($s, $op_names) = @_;
     for (my $opx = 0; $opx < $num_op_nodes; ++$opx) {
-        my $op_name = $ops[oplist_op($oplist, $opx)];
+        my $op_name = $ops[oplist_op($s->{oplist}, $opx)];
         return 1 if index($op_names, $op_name) >= 0;
     }
     return 0;
@@ -207,10 +207,10 @@ sub oplist_has_any {
 
 # Index in list of all permutations of precedence.
 sub oplist_prec_cfg {
-    my ($oplist) = @_;
+    my ($s) = @_;
     my $ap = 0;
     for (my $opx = 0; $opx < $num_op_nodes; ++$opx) {
-        my $op = oplist_op($oplist, $opx);
+        my $op = oplist_op($s->{oplist}, $opx);
         $ap <<= $prec_bits;
         $ap |= $op_prec[$op];
     }
